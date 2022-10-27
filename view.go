@@ -1,4 +1,6 @@
-package main
+// Package reproductgor is a music player with a GUI on GTK4, includes a music miner for a given path, then creates a
+// database which organizes the music.
+package reproductgor
 
 import (
 	"os"
