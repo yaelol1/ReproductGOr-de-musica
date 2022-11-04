@@ -68,7 +68,7 @@ func TestSongWithTags(t *testing.T) {
 		changeTag(songPath, tt)
 		Mine(dirname, database)
 
-		if got := database.FindSong(&tt); !reflect.DeepEqual(got, &tt) {
+		if got, _ := database.FindSong(&tt); !reflect.DeepEqual(got, &tt) {
 			t.Errorf("addSong(%v) = %v, want %v", tt, got, tt)
 		}
 	}

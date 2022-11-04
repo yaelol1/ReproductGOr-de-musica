@@ -60,7 +60,7 @@ func TestAddSong (t *testing.T){
 
 	for _, tt := range tests {
 		database.AddSong(&tt)
-		if got := database.FindSong(&tt); !reflect.DeepEqual(got, &tt) {
+		if got, _ := database.FindSong(&tt); !reflect.DeepEqual(got, &tt) {
 			t.Errorf("AddSong(%v) = %v, want %v", tt, got, tt)
 		}
 

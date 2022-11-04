@@ -2,7 +2,7 @@
 package main
 
 import (
-	"fmt"
+	// "fmt"
 	"log"
 	"os"
 )
@@ -34,6 +34,6 @@ func main(){
 // recoverInvalidAccess recovers from an error.
 func recoverInvalidAccess() {
 	if r := recover(); r != nil {
-		fmt.Println( "Recovered", r )
+		log.Println( "Recovered", r )
 	}
 }
