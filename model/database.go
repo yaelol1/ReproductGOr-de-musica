@@ -2,7 +2,9 @@ package main
 
 import (
 	// "fmts "
-	// "errors"
+	"strconv"
+	"errors"
+	"log"
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -90,34 +92,64 @@ func (database *Database) AddSong(songToAdd *Song) bool{
 		return false
 	}
 
+	// TODO: insertar canción
+	statement, _ := database.Database.Prepare(`INSERT INTO rolas (id_performer, id_album, path, title, track, year, genre)
+	VALUES (?, ?, ?, ?, ?, ?, ?)`)
+	statement.Exec()
 	return true
 }
 
 // FindSong finds a Song in the database and returns the song.
-func (database *Database) FindSong(songToSerch *Song) (*Song, error){
+func (database *Database) FindSong(songToSearch *Song) (*Song, error){
 	url := songToSearch.path
-	rows, _ := database.Query("")
-	// SELECT
-	// id_rola,
-	// id_performer,
-	// id_album,
-	// path,
-	// title,
-	// year,
-	// genre
-	// FROM
-	// rolas
-	// WHERE
-	// path = '~/Music/song.mp3';
+	rows, _ := database.Database.Query(" SELECT id_rola, id_performer, id_album, path, title, year, genre FROM rolas WHERE path = '"+ url + "'")
 
+	var id_rola, id_performer, id_album, year int
+	var path, title, genre string
+	hadNext := false
 
-	// INSERT INTO rolas (id_performer, id_album, path, title, track, year, genre) 
-	// VALUES (1, 1, "~/Music/song.mp3", "My party", 1, 2017, "Indie")
+	for rows.Next(){
+		rows.Scan(&id_rola, &id_performer, &id_album, &path, &title, &year, &genre)
+		log.Printf("id: %v, %v, %v, path: %v, title: %v, year: %v, genre: %v", id_rola, id_performer, id_album, path, title, year, genre )
+		hadNext = true
+	}
+
+	if !hadNext {
+		return nil, errors.New("Song not found.")
+	}
+
 	return &Song{}, nil
 }
 
 
 // addPerformer adds a performer if it doesn't exist.
-func (database *Database) addPerformer(){
+func (database *Database) findPerformer(name string) (int, error) {
+	return 0, nil
 
+}
+
+// addAlbum adds an album to the database and returns an Album and an error.
+func (database *Database) findAlbum(album *Album) (*Album, error) {
+	if ( album.id_Album != 0 ) {
+
+		id := strconv.Itoa(album.id_Album)
+		rows, _ := database.Database.Query("SELECT  path, name, year FROM albums WHERE id ="+id)
+
+		var  year int
+		var path, name string
+
+		for rows.Next(){
+			rows.Scan(&path, &name, &year)
+		}
+
+		return &Album{
+			id_Album: album.id_album,
+			path: path,
+			name: name,
+			year: year,
+		}, nil
+	}
+
+
+	return nil, nil
 }

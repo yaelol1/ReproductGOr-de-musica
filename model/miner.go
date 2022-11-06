@@ -14,6 +14,7 @@ import (
 
 // A Song is a file that contains the basic info of the song.
 type Song struct {
+	id_song int
 	performers string
 	album string
 	path string
@@ -21,6 +22,20 @@ type Song struct {
 	year int
 	genre string
 }
+
+// An Album is a collection of songs
+type Album struct {
+	id_Album int
+	name string
+	path string
+	year int
+}
+
+// TODO: performer or a band and a artist
+// type Performer stuct {
+	// id_performer int
+// }
+
 
 // mine walks recursively the path given, to find every .mp3 song, to store it
 // in the database given.
