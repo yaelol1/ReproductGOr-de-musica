@@ -32,9 +32,16 @@ type Album struct {
 }
 
 // TODO: performer or a band and a artist
-// type Performer stuct {
-	// id_performer int
-// }
+type Performer struct {
+	id_performer int
+	id_type int
+	name string
+}
+
+// Addable checks that the preformer has the fields needed to be added to a database.
+func (performer *Performer) Addable() bool{
+	return performer.name != "" && (performer.id_type <= 4 && performer.id_type >= 0)
+}
 
 // addable checks that the album has every field except an id, so it can be added to the database.
 func (album *Album) Addable() bool{

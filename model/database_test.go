@@ -2,7 +2,7 @@ package main
 
 import (
 	"testing"
-	// "log"
+	"log"
 	"reflect"
 	"os"
 )
@@ -36,9 +36,9 @@ func TestOpenDatabase (t *testing.T) {
 func TestAddSong (t *testing.T){
 	_, databasePath := testingDatabase()
 
-	defer os.Remove( databasePath )
+	defer os.Remove(databasePath)
 
-	database, _ := OpenDatabase( databasePath )
+	database, _ := OpenDatabase(databasePath)
 	tests := []Song{
 		{
 			performers: "Elthon Jon",
@@ -59,6 +59,7 @@ func TestAddSong (t *testing.T){
 	}
 
 	for _, tt := range tests {
+		log.Printf("%v\n", tt)
 		database.AddSong(&tt)
 		if got, _ := database.FindSong(&tt); !reflect.DeepEqual(got, &tt) {
 			t.Errorf("AddSong(%v) = %v, want %v", tt, got, tt)
