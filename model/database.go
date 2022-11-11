@@ -95,7 +95,18 @@ func (database *Database) AddSong(songToAdd *Song) bool{
 	// TODO: insertar canción
 	statement, _ := database.Database.Prepare(`INSERT INTO rolas (id_performer, id_album, path, title, track, year, genre)
 	VALUES (?, ?, ?, ?, ?, ?, ?)`)
-	statement.Exec()
+
+	album := &Album{
+		name: songToAdd.album,
+		path: songToAdd.path,
+	}
+	database.addAlbum(album)
+	id_album := album.id_album
+
+	performer, _ := database.addPerformer(songToAdd.performers)
+	id_performer := performer.id_performer
+
+	statement.Exec(id_performer, id_album, songToAdd.path, songToAdd.title, 0, songToAdd.year, songToAdd.genre)
 	return true
 }
 
@@ -123,16 +134,42 @@ func (database *Database) FindSong(songToSearch *Song) (*Song, error){
 
 
 // addPerformer adds a performer if it doesn't exist.
-func (database *Database) findPerformer(name string) (int, error) {
+func (database *Database) addPerformer(name string) (int, error) {
 	return 0, nil
-
 }
 
-// addAlbum adds an album to the database and returns an Album and an error.
-func (database *Database) findAlbum(album *Album) (*Album, error) {
-	if ( album.id_Album != 0 ) {
+// findPerformer adds a performer if it doesn't exist.
+func (database *Database) findPerformer(name string) (int, error) {
+	return 0, nil
+}
 
-		id := strconv.Itoa(album.id_Album)
+
+// addAlbum adds an album if it doesnt' exist
+func (database *Database) addAlbum(album *Album) (*Album, error) {
+	if albumFound, err := database.findAlbum(album); err == nil{
+		return albumFound, errors.New("Album already in database")
+	}
+
+	if(!album.Addable()){
+		return nil, errors.New("Album needs a name, path and yaer to be added")
+	}
+
+
+	statement, _ := database.Database.Prepare(`INSERT INTO albums (name, path, year)
+	VALUES (?, ?, ?)`)
+	statement.Exec(album.name, album.path, album.year)
+
+	findAlbum(album)
+
+	return album, nil
+}
+
+// findAlbum adds an album to the database and returns the album given with the database entries Album and an error.
+func (database *Database) findAlbum(album *Album) (*Album, error) {
+	// The album given has an id.
+	if ( album.id_album != 0 && album.year != 0 ) {
+
+		id := strconv.Itoa(album.id_album)
 		rows, _ := database.Database.Query("SELECT  path, name, year FROM albums WHERE id ="+id)
 
 		var  year int
@@ -142,14 +179,38 @@ func (database *Database) findAlbum(album *Album) (*Album, error) {
 			rows.Scan(&path, &name, &year)
 		}
 
-		return &Album{
-			id_Album: album.id_album,
-			path: path,
-			name: name,
-			year: year,
-		}, nil
+		album.path = path
+		album.name = name
+		album.year = year
+
+		return album, nil
 	}
 
+	// The Album doesn't have an id, nor a name, therefore cannot be searched.
+	if(album.name == ""){
+		return nil, errors.New("The album must have a Name or an id to be found in the database.")
+	}
 
-	return nil, nil
+	// The album will be searched by name
+	var  id_album, year int
+	var path string
+	hadNext := false
+
+	rows, _ := database.Database.Query("SELECT id_album, path, year FROM albums WHERE name ="+album.name)
+
+	for rows.Next(){
+		rows.Scan(&id_album, &path, &year)
+		hadNext = true
+	}
+
+	album.id_album = id_album
+	album.path = path
+	album.year = year
+
+	// The album wasn't found in the database.
+	if(!hadNext){
+		return nil, errors.New("Album not found.")
+	}
+
+	return album, nil
 }

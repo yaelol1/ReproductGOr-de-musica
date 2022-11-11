@@ -25,7 +25,7 @@ type Song struct {
 
 // An Album is a collection of songs
 type Album struct {
-	id_Album int
+	id_album int
 	name string
 	path string
 	year int
@@ -36,6 +36,10 @@ type Album struct {
 	// id_performer int
 // }
 
+// addable checks that the album has every field except an id, so it can be added to the database.
+func (album *Album) Addable() bool{
+	return album.name != "" && album.path != ""
+}
 
 // mine walks recursively the path given, to find every .mp3 song, to store it
 // in the database given.
