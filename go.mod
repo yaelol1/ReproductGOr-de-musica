@@ -1,6 +1,6 @@
 module reproductgor
 
-go 1.17
+go 1.18
 
 require (
 	github.com/bogem/id3v2/v2 v2.1.3

@@ -101,10 +101,10 @@ func (database *Database) AddSong(songToAdd *Song) bool{
 		path: songToAdd.path,
 	}
 
-	log.Printf("DEBUG: addAlbum enter")
+	log.Printf("DEBUG: addSong addAlbum enter")
 	album, _ = database.addAlbum(album)
 	id_album := album.id_album
-	log.Printf("DEBUG: addAlbum exit")
+	log.Printf("DEBUG: addsong addAlbum exit")
 
 	performer := &Performer{
 		name: songToAdd.performers,
@@ -211,24 +211,35 @@ func (database *Database) findPerformer(performer *Performer) (*Performer, error
 // addAlbum adds an album if it doesnt' exist
 func (database *Database) addAlbum(album *Album) (*Album, error) {
 
-	log.Printf("DEBUG: findAlbum enter")
+	log.Printf("DEBUG: addAlbum album: %v", album)
+	log.Printf("DEBUG: addAlbum findAlbum enter")
 	if albumFound, err := database.findAlbum(album); err == nil{
 
-		log.Printf("DEBUG: findAlbum inside")
+		log.Printf("DEBUG: addAlbum findAlbum inside return error album found")
 		return albumFound, errors.New("Album already in database")
 	}
 	log.Printf("DEBUG: findAlbum exit")
 
 	if !album.Addable() {
-		return nil, errors.New("Album needs a name, path and yaer to be added")
+		return nil, errors.New("Album needs a name, path and year to be added")
 	}
 
 
-	statement, _ := database.Database.Prepare(`INSERT INTO albums (name, path, year)
+	log.Printf("DEBUG: addAlbum insert ")
+	statement, err := database.Database.Prepare(`INSERT INTO albums (name, path, year)
 	VALUES (?, ?, ?)`)
+	if err != nil {
+		log.Print(err)
+	}
 	statement.Exec(album.name, album.path, album.year)
+	log.Printf("DEBUG: addAlbum insert exit ")
 
-	album, _ = database.findAlbum(album)
+	_, findErr := database.findAlbum(album)
+	if findErr != nil {
+		log.Print("Fatal Error:")
+		log.Fatal(err)
+	}
+	log.Printf("DEBUG: addAlbum album: %v", album)
 
 	return album, nil
 }
@@ -236,19 +247,37 @@ func (database *Database) addAlbum(album *Album) (*Album, error) {
 // findAlbum adds an album to the database and returns the album given with the database entries Album and an error.
 func (database *Database) findAlbum(album *Album) (*Album, error) {
 	// The album given has an id.
-	log.Printf("DEBUG: findAlbum if")
 	if album.id_album != 0 && album.year != 0 {
 
 		log.Printf("DEBUG: findAlbum if -> true")
+
 		id := strconv.Itoa(album.id_album)
-		rows, _ := database.Database.Query("SELECT  path, name, year FROM albums WHERE id ="+id)
+		stmtStr := "SELECT  path, name, year FROM albums WHERE id = ?"
+
+		tx, stmt := database.PrepareStatement(stmtStr)
+		defer stmt.Close()
+
+		rows, err := stmt.Query(id)
+		if err != nil {
+			log.Fatal("could not execute query: ", err)
+		}
+		defer rows.Close()
 
 		var  year int
 		var path, name string
 
-		for rows.Next(){
-			rows.Scan(&path, &name, &year)
+		err = stmt.QueryRow("1").Scan(&path, &name, &year)
+		if err != nil {
+			log.Printf("DEBUG: findAlbum album queryRow")
+			log.Print(err)
+			return nil, err
 		}
+		err = rows.Err()
+		if err != nil {
+			log.Fatal(err)
+		}
+		tx.Commit()
+		// Select ends
 
 		album.path = path
 		album.name = name
@@ -266,28 +295,53 @@ func (database *Database) findAlbum(album *Album) (*Album, error) {
 	// The album will be searched by name
 	var  id_album, year int
 	var path string
-	hadNext := false
 
-	log.Printf("DEBUG: findAlbum query")
-	rows, err := database.Database.Query("SELECT id_album, path, year FROM albums WHERE name ="+album.name)
+	// ------------------------
+	stmtStr := "SELECT id_album, path, year FROM albums WHERE name = ?"
+	// prepare statement begin
+	tx, stmt := database.PrepareStatement(stmtStr)
+	// prepare statement close
+	defer stmt.Close()
 
-	log.Printf("DEBUG: findAlbum for rows.Next inicia")
-	for rows.Next() {
-		log.Printf("DEBUG: findAlbum for rows.Next")
-		errRows := rows.Scan(&id_album, &path, &year)
-		hadNext = true
+	rows, err := stmt.Query(album.name)
+	if err != nil {
+		log.Fatal("could not execute query: ", err)
 	}
+	defer rows.Close()
 
-	// The album wasn't found in the database.
-	if !hadNext {
-		log.Printf("DEBUG: findAlbum if !hadNext -> true")
-		return nil, errors.New("Album not found.")
+	err = stmt.QueryRow("0").Scan(&id_album, &path, &year)
+	if err != nil {
+		log.Printf("DEBUG: findAlbum album queryRow nil")
+		log.Print(err)
+		return nil, err
 	}
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+	tx.Commit()
 
-	log.Printf("DEBUG: findAlbum album =")
+	// ------------------------------
+
+	log.Printf("DEBUG: findAlbum album = { %v , %v , %v }",id_album, path, year)
+
 	album.id_album = id_album
 	album.path = path
 	album.year = year
 
 	return album, nil
+}
+
+// PrepareStatement initializes an sqlite prepared statement from a string
+// and returns the corresponding sql context and prepared statement.
+func (database *Database) PrepareStatement(statement string) (*sql.Tx, *sql.Stmt) {
+	tx, err := database.Database.Begin()
+	if err != nil {
+		log.Fatal("could not begin transaction: ", err)
+	}
+	stmt, err := tx.Prepare(statement)
+	if err != nil {
+		log.Fatal("could not prepare statement: ", err)
+	}
+	return tx, stmt
 }

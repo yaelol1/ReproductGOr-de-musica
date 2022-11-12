@@ -36,7 +36,8 @@ func TestOpenDatabase (t *testing.T) {
 func TestAddSong (t *testing.T){
 	_, databasePath := testingDatabase()
 
-	defer os.Remove(databasePath)
+	// TODO: Remove testing database
+	// defer os.Remove(databasePath)
 
 	database, _ := OpenDatabase(databasePath)
 	tests := []Song{

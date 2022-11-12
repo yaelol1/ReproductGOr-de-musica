@@ -67,6 +67,7 @@ func Mine(path string, database *Database) {
 	})
 }
 
+// TODO: glade para gtk4 ?
 // NewSong takes a file and its path to create a Song Struct and return it.
 func NewSong(path string, info os.FileInfo) (*Song, error){
 
