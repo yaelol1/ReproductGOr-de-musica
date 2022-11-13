@@ -10,6 +10,9 @@ import (
 	"log"
 	"path/filepath"
 	"os"
+	// -- testing home path
+	// "os/user"
+
 )
 
 // A Song is a file that contains the basic info of the song.
@@ -51,8 +54,19 @@ func (album *Album) Addable() bool{
 // mine walks recursively the path given, to find every .mp3 song, to store it
 // in the database given.
 func Mine(path string, database *Database) {
+	// home, err := user.Current()
+	// if err != nil {
+	// 	log.Fatal("could not retrieve the current user:", err)
+	// }
+	// homePath := home.HomeDir
+	// start := homePath + "/Music"
+
+	// TODO: only traverses $HOME/Music
+	log.Printf("DEBUG: Mine mining path: %v", path)
 	filepath.Walk(path, func(path string, info os.FileInfo, _ error) error {
+		log.Printf("Walking: %v, info: %v", path, info)
 		if !info.IsDir() {
+			log.Printf("Walking: %v", path)
 			newSong, err := NewSong(path, info)
 
 			// The file didn't have any tags so it wont be stored
@@ -60,14 +74,15 @@ func Mine(path string, database *Database) {
 				log.Print( err )
 				return err
 			}
-			// TODO: Does it affect?
-			go database.AddSong( newSong )
+
+			log.Printf("DEBUG: mine NewSong: %v", newSong)
+			// TODO: Does it affect? if go
+			 database.AddSong( newSong )
 		}
 		return nil
 	})
 }
 
-// TODO: glade para gtk4 ?
 // NewSong takes a file and its path to create a Song Struct and return it.
 func NewSong(path string, info os.FileInfo) (*Song, error){
 

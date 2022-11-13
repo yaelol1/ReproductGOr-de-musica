@@ -11,23 +11,35 @@ import (
 func main(){
 	defer recoverInvalidAccess()
 
+	// Get dir path
 	dirname, err := os.UserConfigDir()
 	dirname += "/reproductgor"
 	if err != nil {
 		log.Print( err )
 	}
 
+	// Make Dir
 	errMk := os.Mkdir(dirname, 0750)
 	if errMk != nil {
 		log.Print( err )
 	}
 
+	databasePath := dirname+"/music.db"
+	var database *Database
+
 	// checks if the database exists
-	if _, err = os.Stat(dirname+"/music.db"); err != nil {
+	if _, err = os.Stat(databasePath); err != nil {
 		log.Printf("Database doesn't exists");
-		NewDatabase( dirname+"/music.db" )
-		log.Print( dirname+"/music.db:  Database created" )
+		NewDatabase( databasePath )
+		log.Printf("%v:  Database created", databasePath)
 	}
+
+	log.Printf("DEBUG: opening database")
+	// Open Database and mine Songs
+	database, _ = OpenDatabase(databasePath)
+
+	log.Printf("DEBUG: mining")
+	Mine("/home/y421/Music", database)
 
 }
 

@@ -88,58 +88,123 @@ func OpenDatabase (path string) (*Database, error){
 // AddSong adds a song to the database, returns true if the song was
 // added or false if it was already in the database.
 func (database *Database) AddSong(songToAdd *Song) bool{
+	log.Printf("DEBUG: addsong findsong ENTER")
 	if _, err := database.FindSong(songToAdd); err == nil{
 		return false
 	}
+	log.Printf("DEBUG: addsong findsong EXIT")
 
-	// TODO: insertar canción
 	statement, _ := database.Database.Prepare(`INSERT INTO rolas (id_performer, id_album, path, title, track, year, genre)
 	VALUES (?, ?, ?, ?, ?, ?, ?)`)
 
+	// Adding or finding the album
 	album := &Album{
 		name: songToAdd.album,
 		path: songToAdd.path,
+		year: songToAdd.year,
 	}
 
-	log.Printf("DEBUG: addSong addAlbum enter")
+	log.Printf("DEBUG: addSong addAlbum ENTER")
 	album, _ = database.addAlbum(album)
 	id_album := album.id_album
-	log.Printf("DEBUG: addsong addAlbum exit, final album: %v", album)
+	log.Printf("DEBUG: addsong addAlbum EXIT, final album: %v", album)
 
+	// Adding or finding the performer
 	performer := &Performer{
 		name: songToAdd.performers,
 		id_type: 3,
 	}
 
+	log.Printf("DEBUG: addSong addPerformer ENTER")
 	performer, _ = database.addPerformer(performer)
 	id_performer := performer.id_performer
+	log.Printf("DEBUG: addSong addPerformer EXIT, final performer:", performer)
 
 	statement.Exec(id_performer, id_album, songToAdd.path, songToAdd.title, 0, songToAdd.year, songToAdd.genre)
+	log.Printf("DEBUG: addSong statement EXEC")
 	return true
 }
 
 // FindSong finds a Song in the database and returns the song.
 func (database *Database) FindSong(songToSearch *Song) (*Song, error){
-	url := songToSearch.path
-	rows, _ := database.Database.Query(" SELECT id_rola, id_performer, id_album, path, title, year, genre FROM rolas WHERE path = '"+ url + "'")
+	// The album given has an id.
+	if songToSearch.id_song != 0  {
+		_, err := database.findSongById(songToSearch)
+		if err == nil {
+			return songToSearch, nil
+		}
+	}
+	log.Printf("DEBUG: findSong if -> else")
 
-	var id_rola, id_performer, id_album, year int
+	// The Album doesn't have an id, nor a name, therefore cannot be searched.
+	if songToSearch.title == "" {
+		return nil, errors.New("The song must have a Title or an id to be found in the database.")
+	}
+
+	// The album will be searched by title
+	var id_song, id_performer, id_album, year int
 	var path, title, genre string
-	hadNext := false
 
-	for rows.Next(){
-		rows.Scan(&id_rola, &id_performer, &id_album, &path, &title, &year, &genre)
-		log.Printf("id: %v, %v, %v, path: %v, title: %v, year: %v, genre: %v", id_rola, id_performer, id_album, path, title, year, genre )
-		hadNext = true
+	// prepare statement begin
+	stmtStr := "SELECT id_rola, id_performer, id_album, path, title, year, genre FROM rolas WHERE path = ? AND title = ?"
+	tx, stmt := database.PrepareStatement(stmtStr)
+	defer stmt.Close()
+
+	// Query
+	rows, err := stmt.Query(songToSearch.path, songToSearch.title)
+	if err != nil {
+		log.Fatal("could not execute query: ", err)
+	}
+	defer rows.Close()
+
+	// Scan the rows
+	for rows.Next() {
+		err := rows.Scan(&id_song, &id_performer, &id_album, &path, &title, &year, &genre)
+		log.Printf("id: %v, %v, %v, path: %v, title: %v, year: %v, genre: %v", id_song, id_performer, id_album, path, title, year, genre )
+		if err != nil {
+			log.Printf("DEBUG: findAlbumById album queryRow nil")
+			log.Print(err)
+			return nil, err
+		}
 	}
 
-	if !hadNext {
-		return nil, errors.New("Song not found.")
+	log.Printf("DEBUG: findSong song found: " )
+	// Check for errors and commit
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+	tx.Commit()
+
+	performer := &Performer{
+		name: songToSearch.performers,
+		id_performer: id_performer,
 	}
 
-	return &Song{}, nil
+	album := &Album{
+		name: songToSearch.album,
+		path: songToSearch.path,
+		year: songToSearch.year,
+	}
+
+	album, _ = database.addAlbum(album)
+
+	performer, _ = database.addPerformer(performer)
+
+	// Store results
+	songToSearch.id_song = id_song
+	songToSearch.performers = performer.name
+	// songToSearch.id_album = id_album
+	songToSearch.album = album.name
+	songToSearch.path = path
+	songToSearch.title = title
+	songToSearch.year = year
+	songToSearch.genre = genre
+
+
+	log.Printf("DEBUG: findSong song found: %v", songToSearch )
+	return songToSearch, nil
 }
-
 
 // addPerformer adds a performer if it doesn't exist.
 func (database *Database) addPerformer(performer *Performer) (*Performer, error) {
@@ -160,24 +225,16 @@ func (database *Database) addPerformer(performer *Performer) (*Performer, error)
 	return performer, nil
 }
 
+func (database *Database) findSongById(songToSearch *Song) (*Song, error){
+	return nil, nil
+}
+
 // findPerformer adds a performer if it doesn't exist.
 func (database *Database) findPerformer(performer *Performer) (*Performer, error) {
 	if performer.id_performer != 0  {
-
-		id := strconv.Itoa(performer.id_performer)
-		rows, _ := database.Database.Query("SELECT id_type, name FROM albums WHERE id ="+id)
-
-		var id_type int
-		var name string
-
-		for rows.Next(){
-			rows.Scan(&id_type, &name)
+		if performerFound, err := database.findPerformerById(performer); err == nil{
+			return performerFound, nil
 		}
-
-		performer.id_type = id_type
-		performer.name = name
-
-		return performer, nil
 	}
 
 	// The Performer doesn't have an id, nor a name, therefore cannot be searched.
@@ -187,26 +244,83 @@ func (database *Database) findPerformer(performer *Performer) (*Performer, error
 
 	// The performer will be searched by name
 	var id_performer, id_type int
-	hadNext := false
 
-	rows, _ := database.Database.Query("SELECT id_performer, id_type FROM performers WHERE name ="+performer.name)
+	// prepare statement begin
+	stmtStr := "SELECT id_performer, id_type FROM performers WHERE name = ?"
+	tx, stmt := database.PrepareStatement(stmtStr)
+	defer stmt.Close()
 
+	// Query
+	rows, err := stmt.Query(performer.name)
+	if err != nil {
+		log.Fatal("could not execute query: ", err)
+	}
+	defer rows.Close()
+
+	// Scan the rows
 	for rows.Next() {
-		rows.Scan(&id_performer, &id_type)
-		hadNext = true
+		err := rows.Scan(&id_performer, &id_type)
+		if err != nil {
+			log.Printf("DEBUG: findAlbumById album queryRow nil")
+			log.Print(err)
+			return nil, err
+		}
 	}
 
-	// The performer wasn't found in the database.
-	if !hadNext {
-		return nil, errors.New("Performer not found.")
+	// Check for errors and commit
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
 	}
+	tx.Commit()
 
+	// Store values
 	performer.id_type = id_type
 	performer.id_performer = id_performer
 
 	return performer, nil
 }
 
+func (database *Database) findPerformerById(performer *Performer) (*Performer, error) {
+	// The performer will be searched by name
+	var id_type int
+	var name string
+
+	// prepare statement begin
+	stmtStr := "SELECT name, id_type FROM performers WHERE id_performer = ? "
+	tx, stmt := database.PrepareStatement(stmtStr)
+	defer stmt.Close()
+
+	// Query
+	rows, err := stmt.Query(performer.id_performer)
+	if err != nil {
+		log.Fatal("could not execute query: ", err)
+	}
+	defer rows.Close()
+
+	// Scan the rows
+	for rows.Next() {
+		err := rows.Scan(&name, &id_type)
+		if err != nil {
+			log.Printf("DEBUG: findAlbumById album queryRow nil")
+			log.Print(err)
+			return nil, err
+		}
+	}
+
+	// Check for errors and commit
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+	tx.Commit()
+
+	// Store values
+	performer.name = name
+	performer.id_type = id_type
+
+	return performer, nil
+}
 
 // addAlbum adds an album if it doesnt' exist
 func (database *Database) addAlbum(album *Album) (*Album, error) {
@@ -357,6 +471,7 @@ func (database *Database) findAlbumById(album *Album) (*Album, error) {
 	return album, nil
 
 }
+
 
 // PrepareStatement initializes an sqlite prepared statement from a string
 // and returns the corresponding sql context and prepared statement.
